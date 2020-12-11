@@ -63,11 +63,21 @@ const reconcileChildren = (fiber, children) => {
     }
     prevFiber = newFiber;
   }
-  console.log(prevFiber);
 };
 
 const executeTask = (fiber) => {
   reconcileChildren(fiber, fiber.props.children);
+
+  if (fiber.child) {
+    return fiber.child;
+  } else {
+    let current = fiber;
+    do {
+      if (current.sibling) {
+        return current.sibling;
+      }
+    } while ((current = current.parent));
+  }
 };
 
 // 更新并循环执行任务
@@ -77,6 +87,7 @@ const workLoop = (deadline) => {
   }
   while (task && deadline.timeRemaining() > 1) {
     task = executeTask(task);
+    console.log(task);
   }
 };
 
