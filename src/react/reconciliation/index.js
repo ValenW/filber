@@ -4,6 +4,7 @@ import { getTag } from "./getTag";
 
 const taskQueue = createTaskQueue();
 let task = null;
+let paddingCommit = null;
 
 /**
  * fiber 将树状结构序列化为顺序结构, 非首个child挂载到前一个兄弟节点上
@@ -65,19 +66,37 @@ const reconcileChildren = (fiber, children) => {
   }
 };
 
+const commitAllWork = () => {
+  console.log(paddingCommit);
+  paddingCommit.effects.forEach((e) => {
+    if (e.effectTag === "placement") {
+      e.parent.stateNode.appendChild(e.stateNode);
+    }
+  });
+  paddingCommit = null;
+};
+
 const executeTask = (fiber) => {
   reconcileChildren(fiber, fiber.props.children);
 
   if (fiber.child) {
     return fiber.child;
-  } else {
-    let current = fiber;
-    do {
-      if (current.sibling) {
-        return current.sibling;
-      }
-    } while ((current = current.parent));
   }
+  let current = fiber;
+  while (current.parent) {
+    current.parent.effects = current.parent.effects.concat(
+      ...current.effects,
+      current
+    );
+    if (current.sibling) {
+      return current.sibling;
+    }
+    current = current.parent;
+  }
+
+  // all fibers is created if arrive here
+  paddingCommit = current;
+  return null;
 };
 
 // 更新并循环执行任务
@@ -87,13 +106,15 @@ const workLoop = (deadline) => {
   }
   while (task && deadline.timeRemaining() > 1) {
     task = executeTask(task);
-    console.log(task);
+  }
+  if (paddingCommit) {
+    commitAllWork();
   }
 };
 
 const performTask = (deadline) => {
   workLoop(deadline);
-  if (!task || !taskQueue.isEmpty()) {
+  if (task || !taskQueue.isEmpty()) {
     requestIdleCallback(performTask);
   }
 };
