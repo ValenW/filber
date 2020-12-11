@@ -3,7 +3,7 @@ import React, { render } from "./react";
 const root = document.getElementById("root");
 const jsx = (
   <div>
-    <p>Hello Filber</p>
+    <p>Hello Fiber</p>
   </div>
 );
 

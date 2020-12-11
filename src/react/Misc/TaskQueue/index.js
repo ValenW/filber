@@ -1,4 +1,4 @@
-export default createTaskQueue = () => {
+export const createTaskQueue = () => {
   const taskQueue = [];
 
   return {
