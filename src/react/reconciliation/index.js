@@ -68,16 +68,30 @@ const reconcileChildren = (fiber, children) => {
 
 const commitAllWork = () => {
   console.log(paddingCommit);
-  paddingCommit.effects.forEach((e) => {
-    if (e.effectTag === "placement") {
-      e.parent.stateNode.appendChild(e.stateNode);
+  paddingCommit.effects.forEach((fiber) => {
+    if (fiber.effectTag === "placement" && fiber.tag === "host_component") {
+      let append = fiber.parent;
+      while (
+        append.tag === "class_component" ||
+        append.tag === "function_component"
+      ) {
+        append = append.parent;
+      }
+
+      append.stateNode.appendChild(fiber.stateNode);
     }
   });
   paddingCommit = null;
 };
 
 const executeTask = (fiber) => {
-  reconcileChildren(fiber, fiber.props.children);
+  if (fiber.tag === "class_component") {
+    reconcileChildren(fiber, fiber.stateNode.render());
+  } else if (fiber.tag === "function_component") {
+    reconcileChildren(fiber, fiber.stateNode(fiber.props));
+  } else {
+    reconcileChildren(fiber, fiber.props.children);
+  }
 
   if (fiber.child) {
     return fiber.child;

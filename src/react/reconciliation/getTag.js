@@ -1,3 +1,10 @@
+import { Component } from "..";
+
 export const getTag = (type) => {
-  return typeof type === "string" ? "host_component" : "";
+  if (typeof type === "string") {
+    return "host_component";
+  } else if (Component.isPrototypeOf(type)) {
+    return "class_component";
+  }
+  return "function_component";
 };
