@@ -1,6 +1,26 @@
 import { createTaskQueue } from "../Misc";
 
 const taskQueue = createTaskQueue();
+let task = null;
+
+const executeTask = (task) => {};
+
+// 更新并循环执行任务
+const workLoop = (deadline) => {
+  if (!task) {
+    task = taskQueue.pop();
+  }
+  while (task && deadline.timeRemaining() > 1) {
+    task = executeTask(task);
+  }
+};
+
+const performTask = (deadline) => {
+  workLoop(deadline);
+  if (!task || !taskQueue.isEmpty()) {
+    requestIdleCallback(performTask);
+  }
+};
 
 export const render = (vNode, container) => {
   console.log(vNode, container);
@@ -12,6 +32,9 @@ export const render = (vNode, container) => {
     dom: container,
     props: { children: vNode.props },
   });
+
+  requestIdleCallback(performTask);
+
   /**
    * 任务是通过vNode构建fiber对象
    */
