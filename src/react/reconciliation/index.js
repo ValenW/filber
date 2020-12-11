@@ -1,6 +1,8 @@
 import { createTaskQueue } from "../Misc";
 import { createStateNode } from "../Misc/createStateNode";
+import { getFirstHostAncestor } from "../Misc/getFirstHostAncestor";
 import { getTag } from "./getTag";
+import { updateDomAttribute } from "../DOM/elementProps";
 
 const taskQueue = createTaskQueue();
 let task = null;
@@ -37,6 +39,7 @@ const buildRootFiber = () => {
         tag: "host_root",
         effects: [],
         child: null,
+        alternate: task.dom.__rootFiberContainer,
       }
     : null;
 };
@@ -44,6 +47,7 @@ const buildRootFiber = () => {
 const reconcileChildren = (fiber, children) => {
   children = Array.isArray(children) ? children : [children];
 
+  let alternate = (fiber.alternate && fiber.alternate.child) || null;
   let prevFiber = null;
   for (let i = 0; i < children.length; i++) {
     const child = children[i];
@@ -52,36 +56,53 @@ const reconcileChildren = (fiber, children) => {
       type: child.type,
       props: child.props,
       effects: [],
-      effectTag: "placement",
+      effectTag: alternate ? "update" : "placement",
       parent: fiber,
+      alternate,
     };
-    newFiber.stateNode = createStateNode(newFiber);
+
+    if (alternate && alternate.type === newFiber.type) {
+      newFiber.stateNode = alternate.stateNode;
+    } else {
+      newFiber.stateNode = createStateNode(newFiber);
+    }
 
     if (i === 0) {
       fiber.child = newFiber;
     } else {
       prevFiber.sibling = newFiber;
     }
+
+    alternate = (alternate && alternate.sibling) || null;
     prevFiber = newFiber;
   }
 };
 
-const commitAllWork = () => {
-  console.log(paddingCommit);
-  paddingCommit.effects.forEach((fiber) => {
-    if (fiber.effectTag === "placement" && fiber.tag === "host_component") {
-      let append = fiber.parent;
-      while (
-        append.tag === "class_component" ||
-        append.tag === "function_component"
-      ) {
-        append = append.parent;
-      }
+const commitAllWork = (fiber) => {
+  console.log(fiber);
 
-      append.stateNode.appendChild(fiber.stateNode);
+  fiber.effects.forEach((fiber) => {
+    if (fiber.tag !== "host_component") {
+      return;
+    }
+
+    const ancestor = getFirstHostAncestor(fiber);
+    const alternate = fiber.alternate;
+    if (fiber.effectTag === "placement") {
+      ancestor.stateNode.appendChild(fiber.stateNode);
+    } else if (fiber.effectTag === "update") {
+      if (fiber.type !== alternate.type) {
+        ancestor.stateNode.replaceChild(fiber.stateNode, alternate.stateNode);
+      } else if (fiber.type !== "text") {
+        updateDomAttribute(alternate.stateNode, fiber, alternate);
+      } else if (fiber.props.textContent !== alternate.props.textContent) {
+        alternate.stateNode.textContent = fiber.props.textContent;
+      }
     }
   });
-  paddingCommit = null;
+
+  // 备份fiber用于更新时对比
+  fiber.stateNode.__rootFiberContainer = fiber;
 };
 
 const executeTask = (fiber) => {
@@ -122,7 +143,8 @@ const workLoop = (deadline) => {
     task = executeTask(task);
   }
   if (paddingCommit) {
-    commitAllWork();
+    commitAllWork(paddingCommit);
+    paddingCommit = null;
   }
 };
 
