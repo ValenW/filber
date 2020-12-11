@@ -76,6 +76,11 @@ const reconcileChildren = (fiber, children) => {
     alternate = (alternate && alternate.sibling) || null;
     prevFiber = newFiber;
   }
+  while (alternate) {
+    alternate.effectTag = "delete";
+    fiber.effects.push(alternate);
+    alternate = alternate.sibling;
+  }
 };
 
 const commitAllWork = (fiber) => {
@@ -88,16 +93,25 @@ const commitAllWork = (fiber) => {
 
     const ancestor = getFirstHostAncestor(fiber);
     const alternate = fiber.alternate;
-    if (fiber.effectTag === "placement") {
-      ancestor.stateNode.appendChild(fiber.stateNode);
-    } else if (fiber.effectTag === "update") {
-      if (fiber.type !== alternate.type) {
-        ancestor.stateNode.replaceChild(fiber.stateNode, alternate.stateNode);
-      } else if (fiber.type !== "text") {
-        updateDomAttribute(alternate.stateNode, fiber, alternate);
-      } else if (fiber.props.textContent !== alternate.props.textContent) {
-        alternate.stateNode.textContent = fiber.props.textContent;
-      }
+    switch (fiber.effectTag) {
+      case "placement":
+        ancestor.stateNode.appendChild(fiber.stateNode);
+        break;
+      case "update":
+        // 子节点是update, 父节点必然是update
+        if (fiber.type !== alternate.type) {
+          ancestor.stateNode.replaceChild(fiber.stateNode, alternate.stateNode);
+        } else if (fiber.type !== "text") {
+          updateDomAttribute(alternate.stateNode, fiber, alternate);
+        } else if (fiber.props.textContent !== alternate.props.textContent) {
+          alternate.stateNode.textContent = fiber.props.textContent;
+        }
+        break;
+      case "delete":
+        fiber.stateNode.remove();
+        break;
+      default:
+        break;
     }
   });
 
